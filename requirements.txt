@@ -1,0 +1,7 @@
+gradio
+moviepy==1.0.3
+pillow
+numpy
+pydub
+ffmpeg-python
+imageio-ffmpeg
