@@ -1,0 +1,51 @@
+name: Validate and deploy ZeroX free Static Space
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'zerox-lyric-motion/**'
+      - '.github/workflows/zerox-lyric-motion-hf.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: zerox-lyric-motion-static
+  cancel-in-progress: false
+jobs:
+  validate-and-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate app syntax and required assets
+        run: |
+          node --check zerox-lyric-motion/studio.js
+          node --check zerox-lyric-motion/worker.js
+          node --check zerox-lyric-motion/effects.js
+          test -s zerox-lyric-motion/index.html
+          test -s zerox-lyric-motion/vendor/gifuct.js
+          test -s zerox-lyric-motion/vendor/gifenc.js
+          test -s zerox-lyric-motion/demo.mp3
+      - name: Check deployment credential
+        id: credential
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -n "$HF_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::NOT DEPLOYED: Add repository Actions secret HF_TOKEN with permission to create/write Zeroxdesignart/zerox-lyric-motion-free. Static deployment requests no paid compute."
+            echo "App validation passed. Hugging Face deployment skipped: HF_TOKEN is missing." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: huggingface/hub-sync@v0.3.0
+        if: steps.credential.outputs.ready == 'true'
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: Zeroxdesignart/zerox-lyric-motion-free
+          hf_token: ${{ secrets.HF_TOKEN }}
+          repo_type: space
+          space_sdk: static
+          subdirectory: zerox-lyric-motion
+          private: false
+          delete_removed: false
